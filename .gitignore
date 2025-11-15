@@ -1,0 +1,161 @@
+# ===============================================
+# Hackintoshster Repository - Git Ignore
+# ===============================================
+
+# ===========================================
+# PROJECT-SPECIFIC DIRECTORIES
+# ===========================================
+/ISOs-ignored/*
+/initial-boot-disks/*
+/ignore/
+/Hash_Files/
+./cursor
+
+# ===========================================
+# SECURITY & PRIVACY (CRITICAL!)
+# ===========================================
+# SMBIOS files contain serial numbers and hardware IDs
+*.smbios.json
+.smbios.json
+**/smbios.json
+*-personal.plist
+*-private.plist
+
+# ===========================================
+# LOGS & TEMPORARY FILES
+# ===========================================
+logs/
+*.log
+tmp/
+temp/
+*.tmp
+*.temp
+*.cache
+
+# ===========================================
+# macOS SYSTEM FILES
+# ===========================================
+*.DS_Store
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.apdisk
+Icon?
+
+# ===========================================
+# WINDOWS SYSTEM FILES
+# ===========================================
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ===========================================
+# LINUX SYSTEM FILES
+# ===========================================
+*~
+.directory
+.Trash-*
+
+# ===========================================
+# IDE & EDITOR FILES
+# ===========================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*.swn
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# ===========================================
+# PYTHON FILES
+# ===========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ===========================================
+# ARCHIVES & PACKAGES (OPTIONAL)
+# ===========================================
+*.dmg
+*.pkg
+*.iso
+
+# ===========================================
+# BACKUP & MISC FILES
+# ===========================================
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+.~lock.*

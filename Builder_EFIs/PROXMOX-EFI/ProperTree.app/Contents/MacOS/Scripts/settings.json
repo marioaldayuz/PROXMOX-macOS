@@ -1,0 +1,14 @@
+{
+    "opacity": 100.0,
+    "drag_dead_zone": 20.0,
+    "enable_drag_and_drop": true,
+    "use_custom_font_size": false,
+    "use_custom_font": false,
+    "open_recent": [],
+    "last_window_width": 730,
+    "last_window_height": 480,
+    "expand_all_items_on_open": false,
+    "comment_strip_prefix": "#",
+    "max_undo": 200,
+    "font_size": 13
+}
