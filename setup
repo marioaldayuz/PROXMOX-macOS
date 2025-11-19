@@ -1222,21 +1222,21 @@ customize_opencore_config() {
 # Returns: Selected Mac model identifier (e.g., "iMac19,1")
 # Default: iMac19,1 for maximum compatibility
 select_mac_model() {
-  echo
-  echo "╔════════════════════════════════════════════════════════════╗"
-  echo "║ Select Mac Model for SMBIOS Generation                    ║"
-  echo "╚════════════════════════════════════════════════════════════╝"
-  echo
-  echo " 1 - iMac19,1           27-inch iMac (2019)"
-  echo " 2 - iMac19,2           21.5-inch iMac (2019)"
-  echo " 3 - Macmini8,1         Mac mini (2018)"
-  echo " 4 - MacPro7,1          Mac Pro (2019)"
-  echo " 5 - MacBookPro15,1     15-inch MacBook Pro (2018-2019)"
-  echo " 6 - MacBookPro15,3     15-inch MacBook Pro (2019)"
-  echo " 7 - MacBookPro16,1     16-inch MacBook Pro (2019)"
-  echo
-  echo " Default: iMac19,1 (recommended for best compatibility)"
-  echo
+  echo >&2
+  echo "╔════════════════════════════════════════════════════════════╗" >&2
+  echo "║ Select Mac Model for SMBIOS Generation                    ║" >&2
+  echo "╚════════════════════════════════════════════════════════════╝" >&2
+  echo >&2
+  echo " 1 - iMac19,1           27-inch iMac (2019)" >&2
+  echo " 2 - iMac19,2           21.5-inch iMac (2019)" >&2
+  echo " 3 - Macmini8,1         Mac mini (2018)" >&2
+  echo " 4 - MacPro7,1          Mac Pro (2019)" >&2
+  echo " 5 - MacBookPro15,1     15-inch MacBook Pro (2018-2019)" >&2
+  echo " 6 - MacBookPro15,3     15-inch MacBook Pro (2019)" >&2
+  echo " 7 - MacBookPro16,1     16-inch MacBook Pro (2019)" >&2
+  echo >&2
+  echo " Default: iMac19,1 (recommended for best compatibility)" >&2
+  echo >&2
   
   local selected_key
   while true; do
@@ -1252,11 +1252,11 @@ select_mac_model() {
     if [[ "$selected_key" =~ ^[1-7]$ ]]; then
       break
     else
-      echo "Invalid selection. Please enter a number between 1-7."
+      echo "Invalid selection. Please enter a number between 1-7." >&2
     fi
   done
   
-  # Return the selected model identifier
+  # Return the selected model identifier (to stdout for capture)
   case "$selected_key" in
     1) echo "iMac19,1" ;;
     2) echo "iMac19,2" ;;
