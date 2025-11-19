@@ -81,12 +81,74 @@ else
 fi
 log_message "Detected platform: $OSX_PLATFORM"
 
-# Clean up problematic repository files
-log_message "Cleaning up existing repository configurations..."
-[ -f "/etc/apt/sources.list.d/pve-enterprise.list" ] && rm -f "/etc/apt/sources.list.d/pve-enterprise.list"
-[ -f "/etc/apt/sources.list.d/ceph.list" ] && rm -f "/etc/apt/sources.list.d/ceph.list"
-[ -f "/etc/apt/sources.list.d/pve-enterprise.sources" ] && rm -f "/etc/apt/sources.list.d/pve-enterprise.sources"
-[ -f "/etc/apt/sources.list.d/ceph.sources" ] && rm -f "/etc/apt/sources.list.d/ceph.sources"
+# Detect subscription type
+log_message "Detecting Proxmox subscription type..."
+IS_ENTERPRISE=false
+
+# Check if subscription appears to be configured
+if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ] || [ -f "/etc/apt/sources.list.d/pve-enterprise.sources" ]; then
+    # Enterprise repos exist - check if subscription is active
+    if command -v pvesubscription &> /dev/null; then
+        SUBSCRIPTION_STATUS=$(pvesubscription get 2>/dev/null | grep -i "status" | head -n1 || echo "")
+        
+        if echo "$SUBSCRIPTION_STATUS" | grep -qi "active"; then
+            log_message "✓ Active Enterprise subscription detected"
+            IS_ENTERPRISE=true
+        else
+            # Subscription exists but may be expired/invalid
+            echo
+            echo "⚠️  WARNING: Enterprise repositories are configured, but subscription status is unclear or inactive."
+            echo "   Status: ${SUBSCRIPTION_STATUS:-Unable to determine}"
+            echo
+            echo "   If your subscription is expired or invalid, apt-get update will fail."
+            echo
+            read -p "Do you have an active Enterprise subscription? [y/N]: " has_subscription
+            if [[ "$has_subscription" =~ ^[Yy]$ ]]; then
+                IS_ENTERPRISE=true
+                log_message "User confirmed active Enterprise subscription"
+            else
+                log_message "User indicated no active Enterprise subscription"
+            fi
+        fi
+    else
+        # Can't check status, ask user
+        echo
+        echo "⚠️  Enterprise repositories detected but unable to verify subscription status."
+        echo
+        read -p "Do you have an active Proxmox Enterprise subscription? [y/N]: " has_subscription
+        if [[ "$has_subscription" =~ ^[Yy]$ ]]; then
+            IS_ENTERPRISE=true
+            log_message "User confirmed Enterprise subscription"
+        else
+            log_message "User indicated Community/Home Lab installation"
+        fi
+    fi
+else
+    # No enterprise repos - ask user preference
+    echo
+    echo "Proxmox Installation Type:"
+    echo "  [E] Enterprise (paid subscription with enterprise repositories)"
+    echo "  [H] Home Lab / Community (free, no subscription)"
+    echo
+    read -p "Select your installation type [E/h]: " install_type
+    if [[ "$install_type" =~ ^[Ee]$ ]]; then
+        IS_ENTERPRISE=true
+        log_message "User selected Enterprise installation"
+    else
+        log_message "User selected Home Lab/Community installation"
+    fi
+fi
+
+# Clean up problematic repository files (only for non-Enterprise users)
+if [ "$IS_ENTERPRISE" = false ]; then
+    log_message "Cleaning up enterprise repository configurations (Community/Home Lab mode)..."
+    [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ] && rm -f "/etc/apt/sources.list.d/pve-enterprise.list"
+    [ -f "/etc/apt/sources.list.d/ceph.list" ] && rm -f "/etc/apt/sources.list.d/ceph.list"
+    [ -f "/etc/apt/sources.list.d/pve-enterprise.sources" ] && rm -f "/etc/apt/sources.list.d/pve-enterprise.sources"
+    [ -f "/etc/apt/sources.list.d/ceph.sources" ] && rm -f "/etc/apt/sources.list.d/ceph.sources"
+else
+    log_message "✓ Keeping enterprise repositories (Enterprise mode)"
+fi
 
 # Update package lists
 log_message "Updating package lists..."
@@ -156,9 +218,13 @@ printf "options kvm ignore_msrs=Y report_ignored_msrs=0\n" > /etc/modprobe.d/kvm
 # Allow VFIO interrupt remapping for better device passthrough compatibility
 printf "options vfio_iommu_type1 allow_unsafe_interrupts=1\n" > /etc/modprobe.d/iommu_unsafe_interrupts.conf
 
-# Patch Proxmox web UI to remove subscription nag message
-log_message "Patching Proxmox web UI..."
-[ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ] && sed -i.backup -z "s/res === null || res === undefined || \!res || res\n\t\t\t.data.status.toLowerCase() \!== 'active'/false/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+# Patch Proxmox web UI to remove subscription nag message (only for non-Enterprise users)
+if [ "$IS_ENTERPRISE" = false ]; then
+    log_message "Patching Proxmox web UI to remove subscription nag..."
+    [ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ] && sed -i.backup -z "s/res === null || res === undefined || \!res || res\n\t\t\t.data.status.toLowerCase() \!== 'active'/false/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+else
+    log_message "✓ Skipping subscription nag removal (Enterprise mode)"
+fi
 
 # Create marker file to prevent re-running prerequisites on subsequent executions
 mkdir -p /etc/pve/qemu-server 2>/dev/null || true
@@ -179,6 +245,12 @@ log_message "✓ IOMMU configured for $OSX_PLATFORM"
 log_message "✓ Kernel modules configured"
 log_message "✓ GRUB updated"
 log_message "✓ Command alias created: mac"
+if [ "$IS_ENTERPRISE" = true ]; then
+    log_message "✓ Enterprise repositories preserved"
+    log_message "✓ Subscription nag patch skipped"
+else
+    log_message "✓ Community/Home Lab mode configured"
+fi
 echo
 log_message "⚠️  A SYSTEM REBOOT IS REQUIRED to apply kernel changes."
 echo
