@@ -1535,7 +1535,7 @@ configure_network_bridge() {
   # Local error handler that logs and terminates function execution
   die() {
     display_and_log "ERROR: $*" "$logfile"
-    exit 1
+    return 1
   }
 
   # Local warning handler for non-fatal issues
