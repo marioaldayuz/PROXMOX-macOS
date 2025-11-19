@@ -2230,12 +2230,12 @@ main_menu() {
     echo "╔═══════════════════════════════════════════════════════════╗"
     echo "║ SYSTEM UTILITIES                                          ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
-    echo " NVE - Add Proxmox VE no-subscription repository"
-    echo " OCI - Update default OpenCore ISO (legacy/fallback only)"
-    echo " CRI - Clear all cached macOS recovery images"
-    echo " RPS - Remove Proxmox subscription notice"
-    echo " NBR - Add new network bridge (macOS in cloud)"
-    echo " CCP - Customize OpenCore config.plist"
+    echo " 3 - Add Proxmox VE no-subscription repository"
+    echo " 4 - Update default OpenCore ISO (legacy/fallback only)"
+    echo " 5 - Clear all cached macOS recovery images"
+    echo " 6 - Remove Proxmox subscription notice"
+    echo " 7 - Add new network bridge (macOS in cloud)"
+    echo " 8 - Customize OpenCore config.plist"
     echo
     echo " 0   - Quit (or press ENTER)"
     echo
@@ -2248,12 +2248,12 @@ main_menu() {
       configure_macos_vm "${MACOS_CONFIG[$OPT]}" "$NEXTID" "$OPT"
     else
       case $OPT in
-        NVE) add_no_subscription_repo ;;
-        OCI) update_opencore_iso ;;
-        CRI) clear_recovery_images ;;
-        RPS) remove_subscription_notice ;;
-        NBR) configure_network_bridge ;;
-        CCP) customize_opencore_config ;;
+        3) add_no_subscription_repo ;;
+        4) update_opencore_iso ;;
+        5) clear_recovery_images ;;
+        6) remove_subscription_notice ;;
+        7) configure_network_bridge ;;
+        8) customize_opencore_config ;;
         *) echo "Invalid option"; read -n 1 -s ;;
       esac
     fi
