@@ -796,23 +796,16 @@ update_opencore_smbios() {
           display_and_log "✓ Using validated serial number from API" "$logfile"
         else
           # API failed, fall back to GenSMBIOS
-          display_and_log "⚠ API unavailable, falling back to GenSMBIOS..." "$logfile"
-          echo
-          SystemProductName="iMacPro1,1"
-          read -e -p "Enter System Product Name (press Enter to keep current): " -i "$SystemProductName" new_value
-          if [ -n "$new_value" ] && [ "$new_value" != "$SystemProductName" ]; then
-            SystemProductName="$new_value"
-          fi
+          display_and_log "⚠ API unavailable, falling back to macserial..." "$logfile"
+          SystemProductName=$(select_mac_model)
+          display_and_log "Selected Mac model: $SystemProductName" "$logfile"
           generate_smbios_with_macserial "$SystemProductName" "$oc_json_path" || log_and_exit "Failed to generate SMBIOS" "$logfile"
         fi
       else
         # User explicitly chose GenSMBIOS
         display_and_log "Using macserial for random serial generation" "$logfile"
-        SystemProductName="iMacPro1,1"
-        read -e -p "Enter System Product Name (press Enter to keep current): " -i "$SystemProductName" new_value
-        if [ -n "$new_value" ] && [ "$new_value" != "$SystemProductName" ]; then
-          SystemProductName="$new_value"
-        fi
+        SystemProductName=$(select_mac_model)
+        display_and_log "Selected Mac model: $SystemProductName" "$logfile"
         generate_smbios_with_macserial "$SystemProductName" "$oc_json_path" || log_and_exit "Failed to generate SMBIOS" "$logfile"
       fi
     else
@@ -1225,9 +1218,64 @@ customize_opencore_config() {
   read -n 1 -sp "Press any key to return to menu..."
 }
 
+# Present menu for selecting Mac model for SMBIOS generation
+# Returns: Selected Mac model identifier (e.g., "iMac19,1")
+# Default: iMac19,1 for maximum compatibility
+select_mac_model() {
+  # Define compatible Mac models (2018-2019+ era, Skylake/Coffee Lake compatible)
+  # Array format: "Key|Model|Description"
+  local -A MAC_MODELS=(
+    [1]="iMac19,1|27-inch iMac (2019)|Retina 5K, ideal for desktop VM"
+    [2]="iMac19,2|21.5-inch iMac (2019)|Retina 4K, compact desktop"
+    [3]="Macmini8,1|Mac mini (2018)|Compact server-style Mac"
+    [4]="MacPro7,1|Mac Pro (2019)|Maximum performance, tower workstation"
+    [5]="MacBookPro15,1|15-inch MacBook Pro (2018-2019)|High-performance laptop"
+    [6]="MacBookPro15,3|15-inch MacBook Pro (2019)|Touch Bar, dedicated GPU"
+    [7]="MacBookPro16,1|16-inch MacBook Pro (2019)|Latest 15/16-inch design"
+  )
+  
+  echo
+  echo "╔════════════════════════════════════════════════════════════╗"
+  echo "║ Select Mac Model for SMBIOS Generation                    ║"
+  echo "╚════════════════════════════════════════════════════════════╝"
+  echo
+  
+  # Display options sorted by key
+  for i in $(seq 1 7); do
+    IFS='|' read -r model desc <<< "${MAC_MODELS[$i]}"
+    printf " %d - %-18s %s\n" "$i" "$model" "$desc"
+  done
+  
+  echo
+  echo " Default: iMac19,1 (recommended for best compatibility)"
+  echo
+  
+  local selected_key
+  while true; do
+    read -rp "Select Mac model [1-7, or ENTER for default]: " selected_key
+    
+    # Default to option 1 (iMac19,1) if empty
+    if [[ -z "$selected_key" ]]; then
+      selected_key=1
+      break
+    fi
+    
+    # Validate numeric input within range
+    if [[ "$selected_key" =~ ^[1-7]$ ]]; then
+      break
+    else
+      echo "Invalid selection. Please enter a number between 1-7."
+    fi
+  done
+  
+  # Extract and return the model identifier
+  IFS='|' read -r model _ <<< "${MAC_MODELS[$selected_key]}"
+  echo "$model"
+}
+
 # Generate SMBIOS using macserial binary directly
 # Non-interactive alternative to GenSMBIOS.py menu-driven interface
-# Parameters: $1 - Mac model (e.g., "iMacPro1,1"), $2 - Output JSON path
+# Parameters: $1 - Mac model (e.g., "iMac19,1"), $2 - Output JSON path
 # Returns: 0 on success, 1 on failure
 generate_smbios_with_macserial() {
   local mac_model="$1"
@@ -1425,10 +1473,10 @@ build_custom_opencore_iso() {
   if fetch_validated_smbios "$smbios_json"; then
     display_and_log "→ ✓ API SMBIOS generation successful" "$logfile" >&2
   else
-    # Fallback to macserial - use default Mac model
-    display_and_log "→ API unavailable, using macserial with default model..." "$logfile" >&2
-    mac_model="iMacPro1,1"
-    display_and_log "→ Using Mac model: $mac_model (default)" "$logfile" >&2
+    # Fallback to macserial - let user select Mac model
+    display_and_log "→ API unavailable, using macserial..." "$logfile" >&2
+    mac_model=$(select_mac_model)
+    display_and_log "→ Using Mac model: $mac_model" "$logfile" >&2
     
     # Generate SMBIOS using macserial
     if ! generate_smbios_with_macserial "$mac_model" "$smbios_json"; then
