@@ -90,7 +90,7 @@ This project draws from established Hackintosh community resources and documenta
 | macOS Version | Configuration Notes |
 | -------------- | ------------------- |
 | **15 Sequoia** | Requires `SecureBootModel` disabled during install |
-| **26 Tahoe** | Ensure proper TSC stability; see [Hackintoshster documentation](https://github.com/marioaldayuz/hackintoshster-main) |
+| **26 Tahoe** | Ensure proper TSC stability; see [Hackintoshster documentation](https://github.com/marioaldayuz/PROXMOX-macOS) |
 
 After installation, you may re-enable `SecureBootModel` and SIP as desired.
 

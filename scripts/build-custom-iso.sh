@@ -650,7 +650,7 @@ REFERENCES
 ----------
 - QEMU CPU Optimization Guide for macOS VMs
 - OpenCore:   https://github.com/acidanthera/OpenCorePkg
-- Project:    https://github.com/marioaldayuz/hackintoshster-main
+- Project:    https://github.com/marioaldayuz/PROXMOX-macOS
 
 ═══════════════════════════════════════════════════════════
            Built by Hackintoshster v2025.11.23
@@ -811,8 +811,8 @@ cleanup_build_dir() {
     echo "→ Cleaning up build directory..." >&2
     log_message "Cleaning up build directory: $build_dir"
     
-    # Check if it's in /tmp or in TMPDIR (which might be /root/hackintoshster-main/tmp)
-    if [[ "$build_dir" == /tmp/* ]] || [[ "$build_dir" == */hackintoshster-main/tmp/* ]]; then
+    # Check if it's in /tmp or in TMPDIR (which might be /root/PROXMOX-macOS/tmp)
+    if [[ "$build_dir" == /tmp/* ]] || [[ "$build_dir" == */PROXMOX-macOS/tmp/* ]]; then
         rm -rf "$build_dir" 2>/dev/null || {
             echo "  WARNING: Failed to cleanup build directory" >&2
             log_message "WARNING: Failed to cleanup build directory: $build_dir"

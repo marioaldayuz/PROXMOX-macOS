@@ -21,7 +21,7 @@
 set -e
 
 # Global configuration constants defining paths, versions, and resource allocation defaults
-SCRIPT_DIR="/root/hackintoshster-main"              # Primary working directory for all script operations
+SCRIPT_DIR="/root/PROXMOX-macOS"              # Primary working directory for all script operations
 LOGDIR="${SCRIPT_DIR}/logs"                         # Centralized location for all operation logs
 MAIN_LOG="${LOGDIR}/main.log"                       # Master log file capturing all script activities
 TMPDIR="${SCRIPT_DIR}/tmp"                          # Temporary storage for ISO building and loop mounts
@@ -518,7 +518,7 @@ setup_prerequisites() {
   # Patch Proxmox web UI to remove subscription nag message
   [ -f /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js ] && sed -i.backup -z "s/res === null || res === undefined || \!res || res\n\t\t\t.data.status.toLowerCase() \!== 'active'/false/g" /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
   # Create marker file to prevent re-running prerequisites on subsequent executions
-  touch /etc/pve/qemu-server/.hackintoshster-main
+  touch /etc/pve/qemu-server/.PROXMOX-macOS
   # Regenerate GRUB configuration with new kernel parameters
   update-grub >>"$logfile" 2>&1 || log_and_exit "Failed to update GRUB" "$logfile"
   display_and_log "Prerequisites setup complete. A reboot is necessary to apply the required changes. Press enter to reboot or Ctrl+C if you intend to reboot later." "$logfile"
@@ -1384,7 +1384,7 @@ generate_smbios_with_macserial() {
 update_opencore_iso() {
   local iso_path
   local logfile="${LOGDIR}/update-opencore-iso.log"
-  local iso_url="https://github.com/thenotoriousllama/hackintoshster-main/raw/main/EFI/opencore-hackintoshster-main-vm.iso"
+  local iso_url="https://github.com/thenotoriousllama/PROXMOX-macOS/raw/main/EFI/opencore-PROXMOX-macOS-vm.iso"
   iso_path="${ISODIR}/${OPENCORE_ISO}"
   oc_json_path="${ISODIR}/.smbios.json"
 
@@ -2277,12 +2277,12 @@ sleep 2
 # Detect CPU platform (AMD vs Intel) for platform-specific configurations
 OSX_PLATFORM=$(detect_cpu_platform)
 # Check if system has been initialized
-if [[ ! -e /etc/pve/qemu-server/.hackintoshster-main ]]; then
+if [[ ! -e /etc/pve/qemu-server/.PROXMOX-macOS ]]; then
   echo
   echo "⚠️  System not initialized!"
   echo
   echo "Please run the install script first:"
-  echo "  cd /root/hackintoshster-main && ./install.sh"
+  echo "  cd /root/PROXMOX-macOS && ./install.sh"
   echo
   echo "This will configure your Proxmox host and reboot the system."
   exit 1

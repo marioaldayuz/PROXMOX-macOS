@@ -35,8 +35,8 @@ You'll need a fresh installation of Proxmox VE (versions 7.0.x through 9.0.x ful
 3. Execute these commands:
 
 ```bash
-cd /root && git clone https://github.com/marioaldayuz/hackintoshster-main.git
-cd hackintoshster-main && chmod +x install.sh && ./install.sh
+cd /root && git clone https://github.com/marioaldayuz/PROXMOX-macOS.git
+cd PROXMOX-macOS && chmod +x install.sh && ./install.sh
 ```
 
 4. **System will reboot** to apply kernel changes
@@ -578,7 +578,7 @@ Advanced users can build ISOs manually:
 
 ```bash
 # Generate SMBIOS first
-cd /root/hackintoshster-main
+cd /root/PROXMOX-macOS
 ./Supporting_Tools/Misc_Tools/GenSMBIOS/GenSMBIOS.command
 
 # Build custom ISO
@@ -586,7 +586,7 @@ cd /root/hackintoshster-main
   --efi-source "Builder_EFIs/PROXMOX-EFI" \
   --smbios-json "/path/to/smbios.json" \
   --output-dir "/var/lib/vz/template/iso" \
-  --script-dir "/root/hackintoshster-main"
+  --script-dir "/root/PROXMOX-macOS"
 ```
 
 ### Network Bridge Creation
@@ -712,7 +712,7 @@ Then rebuild the ISO. BOOT.img should be RAW FAT16 (no partition table).
 ### Update Hackintoshster
 
 ```bash
-cd /root/hackintoshster-main
+cd /root/PROXMOX-macOS
 git pull origin main
 ```
 
@@ -741,7 +741,7 @@ This deletes `sequoia.iso` and `tahoe.iso` from your ISO storage. They'll be re-
 ## 📚 Project Structure
 
 ```
-hackintoshster-main/
+PROXMOX-macOS/
 ├── setup (main script - aliased as 'mac')
 ├── install.sh (one-time Proxmox configuration)
 ├── Builder_EFIs/

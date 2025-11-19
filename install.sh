@@ -58,9 +58,9 @@ echo
 log_message "Starting Hackintoshster installation from: $SCRIPT_DIR"
 
 # Check if already installed
-if [ -f /etc/pve/qemu-server/.hackintoshster-main ]; then
+if [ -f /etc/pve/qemu-server/.PROXMOX-macOS ]; then
     log_message "⚠️  Hackintoshster appears to be already installed."
-    log_message "Marker file exists: /etc/pve/qemu-server/.hackintoshster-main"
+    log_message "Marker file exists: /etc/pve/qemu-server/.PROXMOX-macOS"
     echo
     read -p "Reinstall? This will reconfigure system settings. [y/N]: " reinstall
     if [[ ! "$reinstall" =~ ^[Yy]$ ]]; then
@@ -69,7 +69,7 @@ if [ -f /etc/pve/qemu-server/.hackintoshster-main ]; then
         echo "To create VMs, run: ./setup or mac"
         exit 0
     fi
-    rm -f /etc/pve/qemu-server/.hackintoshster-main
+    rm -f /etc/pve/qemu-server/.PROXMOX-macOS
 fi
 
 # Detect CPU platform (AMD vs Intel) for platform-specific configurations
@@ -228,7 +228,7 @@ fi
 
 # Create marker file to prevent re-running prerequisites on subsequent executions
 mkdir -p /etc/pve/qemu-server 2>/dev/null || true
-touch /etc/pve/qemu-server/.hackintoshster-main
+touch /etc/pve/qemu-server/.PROXMOX-macOS
 
 # Regenerate GRUB configuration with new kernel parameters
 log_message "Updating GRUB configuration..."
