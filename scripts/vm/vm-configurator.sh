@@ -15,6 +15,7 @@ source "${SCRIPT_DIR}/scripts/lib/config.sh"
 source "${SCRIPT_DIR}/scripts/lib/logging.sh"
 source "${SCRIPT_DIR}/scripts/lib/validation.sh"
 source "${SCRIPT_DIR}/scripts/lib/math-utils.sh"
+source "${SCRIPT_DIR}/scripts/lib/profiles.sh"
 source "${SCRIPT_DIR}/scripts/storage/storage-manager.sh"
 source "${SCRIPT_DIR}/scripts/network/bridge-manager.sh"
 source "${SCRIPT_DIR}/scripts/recovery/recovery-manager.sh"
@@ -31,7 +32,9 @@ create_vm_noninteractive() {
     sequoia) macos_option="1" ;;
     tahoe) macos_option="2" ;;
     *)
-      log_and_exit "Invalid macOS version: $CLI_VERSION. Use 'sequoia' or 'tahoe'" "$logfile"
+      display_and_log "❌ Error: Invalid macOS version: $CLI_VERSION" "$logfile"
+      display_and_log "   Valid options: 'sequoia' or 'tahoe'" "$logfile"
+      log_and_exit "Invalid version specified" "$logfile"
       ;;
   esac
   
@@ -44,23 +47,61 @@ create_vm_noninteractive() {
   
   # Validate VM ID doesn't exist
   if [[ -e "/etc/pve/qemu-server/$vm_id.conf" ]]; then
-    log_and_exit "VM ID $vm_id already exists" "$logfile"
+    display_and_log "❌ Error: VM ID $vm_id already exists" "$logfile"
+    display_and_log "   Try a different ID or use --vmid to specify another" "$logfile"
+    display_and_log "   List existing VMs: qm list" "$logfile"
+    log_and_exit "VM ID conflict" "$logfile"
   fi
   
   # Set VM name (use default if not specified)
   local vm_name="${CLI_VM_NAME:-${DEFAULT_VM_PREFIX}$(echo "$version_name" | tr -s ' ' | sed 's/^[ ]*//;s/[ ]*$//;s/[ ]/-/g' | tr '[:lower:]' '[:upper:]' | sed 's/-*$//')}"
   
   if ! validate_vm_name "$vm_name"; then
-    log_and_exit "Invalid VM name: $vm_name" "$logfile"
+    display_and_log "❌ Error: Invalid VM name: $vm_name" "$logfile"
+    display_and_log "   VM names must use alphanumeric characters, -, _, . only (no spaces)" "$logfile"
+    log_and_exit "Invalid VM name" "$logfile"
   fi
   
-  # Set disk size
-  local disk_size="${CLI_DISK_SIZE:-80}"
+  # Handle profile or individual settings
+  local disk_size cores ram
+  
+  if [[ -n "$CLI_PROFILE" ]]; then
+    # Use profile
+    if ! validate_profile_name "$CLI_PROFILE"; then
+      display_and_log "❌ Error: Invalid profile: $CLI_PROFILE" "$logfile"
+      display_and_log "   Valid profiles: minimal, balanced, performance, maximum" "$logfile"
+      log_and_exit "Invalid profile specified" "$logfile"
+    fi
+    
+    IFS='|' read -r cores ram disk_size <<< "$(get_profile_values "$CLI_PROFILE")"
+    display_and_log "Using profile: $CLI_PROFILE" "$logfile"
+    display_and_log "  CPU Cores: $cores" "$logfile"
+    display_and_log "  RAM: $((ram / 1024))GB" "$logfile"
+    display_and_log "  Disk: ${disk_size}GB" "$logfile"
+  else
+    # Use individual settings or defaults
+    disk_size="${CLI_DISK_SIZE:-80}"
+    cores="${CLI_CORES:-4}"
+    
+    # Adjust cores to power of 2 if needed
+    if ! is_power_of_2 "$cores"; then
+      cores=$(next_power_of_2 "$cores")
+      display_and_log "Adjusted cores to power of 2: $cores" "$logfile"
+    fi
+    ((cores > MAX_CORES)) && cores=$MAX_CORES
+    
+    # Set RAM (auto-calculate if not specified)
+    ram="${CLI_RAM:-$((BASE_RAM_SIZE + cores * RAM_PER_CORE))}"
+  fi
   
   # Get storage
   local storage="${CLI_STORAGE}"
   if [[ -z "$storage" ]]; then
-    local storage_output=$(get_available_storages) || log_and_exit "Failed to retrieve storages" "$logfile"
+    local storage_output=$(get_available_storages) || {
+      display_and_log "❌ Error: Failed to retrieve available storages" "$logfile"
+      display_and_log "   Check Proxmox storage configuration" "$logfile"
+      log_and_exit "Storage detection failed" "$logfile"
+    }
     local default_storage=$(echo "$storage_output" | tail -1)
     storage="$default_storage"
   fi
@@ -68,19 +109,10 @@ create_vm_noninteractive() {
   # Get bridge
   local bridge="${CLI_BRIDGE:-vmbr0}"
   if [[ ! -d "/sys/class/net/$bridge" ]]; then
-    log_and_exit "Bridge $bridge does not exist" "$logfile"
+    display_and_log "❌ Error: Network bridge '$bridge' does not exist" "$logfile"
+    display_and_log "   Available bridges: $(ls -1 /sys/class/net/ | grep vmbr | tr '\n' ' ')" "$logfile"
+    log_and_exit "Bridge not found" "$logfile"
   fi
-  
-  # Set CPU cores (adjust to power of 2 if needed)
-  local cores="${CLI_CORES:-4}"
-  if ! is_power_of_2 "$cores"; then
-    cores=$(next_power_of_2 "$cores")
-    display_and_log "Adjusted cores to power of 2: $cores" "$logfile"
-  fi
-  ((cores > MAX_CORES)) && cores=$MAX_CORES
-  
-  # Set RAM (auto-calculate if not specified)
-  local ram="${CLI_RAM:-$((BASE_RAM_SIZE + cores * RAM_PER_CORE))}"
   
   # Download recovery image if requested
   if [[ "${CLI_DOWNLOAD_RECOVERY}" == "yes" ]]; then
@@ -147,6 +179,38 @@ configure_macos_vm() {
 
   echo
   echo "══════════════════════════════════════════════════"
+  echo "  VM Configuration Profile"
+  echo "══════════════════════════════════════════════════"
+  echo
+  
+  # Profile selection
+  local selected_profile=$(select_profile_interactive)
+  local SIZEDISK PROC_COUNT RAM_SIZE
+  
+  if [[ "$selected_profile" == "custom" ]]; then
+    # Custom configuration - will prompt for each value individually later
+    USE_CUSTOM_CONFIG=true
+  else
+    # Use profile values
+    IFS='|' read -r PROC_COUNT RAM_SIZE SIZEDISK <<< "$(get_profile_values "$selected_profile")"
+    USE_CUSTOM_CONFIG=false
+    
+    echo
+    echo "Profile configuration applied:"
+    echo "  CPU Cores: $PROC_COUNT"
+    echo "  RAM: $((RAM_SIZE / 1024))GB ($RAM_SIZE MiB)"
+    echo "  Disk: ${SIZEDISK}GB"
+    echo
+    read -rp "Continue with these settings? (y/n): " confirm_profile
+    if [[ ! "$confirm_profile" =~ ^[Yy]$ ]]; then
+      display_and_log "Configuration cancelled. Returning to menu..."
+      read -n 1 -sp "Press any key to continue..."
+      return 1
+    fi
+  fi
+
+  echo
+  echo "══════════════════════════════════════════════════"
   echo "  Building Custom OpenCore ISO"
   echo "══════════════════════════════════════════════════"
   echo
@@ -177,16 +241,19 @@ configure_macos_vm() {
   echo
 
   # Modern macOS 15+ requires more disk space - default to 80GB
-  local default_disk_size=80
-  while true; do
-    read -rp "Disk size (GB) [default: $default_disk_size]: " SIZEDISK
-    SIZEDISK=${SIZEDISK:-$default_disk_size}
-    if [[ "$SIZEDISK" =~ ^[0-9]+$ ]]; then
-      break
-    else
-      display_and_log "Disk size must be an integer. Please try again."
-    fi
-  done
+  # Only prompt if using custom config (profile already set this)
+  if [[ "$USE_CUSTOM_CONFIG" == "true" ]]; then
+    local default_disk_size=80
+    while true; do
+      read -rp "Disk size (GB) [default: $default_disk_size]: " SIZEDISK
+      SIZEDISK=${SIZEDISK:-$default_disk_size}
+      if [[ "$SIZEDISK" =~ ^[0-9]+$ ]]; then
+        break
+      else
+        display_and_log "Disk size must be an integer. Please try again."
+      fi
+    done
+  fi
 
   # Storage Selection
   local storage_output=$(get_available_storages) || { display_and_log "Failed to retrieve storages"; read -n 1 -s; return 1; }
@@ -281,35 +348,38 @@ configure_macos_vm() {
     done
   fi
 
-  # CPU Cores (power of 2 recommended for macOS: 1, 2, 4, 8, 16)
-  while true; do
-    display_and_log "\nRecommended CPU cores (power of 2): 1, 2, 4, 8, 16"
-    read -rp "CPU cores [4]: " PROC_COUNT
-    PROC_COUNT=${PROC_COUNT:-4}
-    if [[ "$PROC_COUNT" =~ ^[0-9]+$ ]]; then
-      if ! is_power_of_2 "$PROC_COUNT"; then
-        PROC_COUNT=$(next_power_of_2 "$PROC_COUNT")
-        display_and_log "→ Adjusted to next power of 2: $PROC_COUNT"
+  # CPU Cores and RAM (only prompt if using custom config)
+  if [[ "$USE_CUSTOM_CONFIG" == "true" ]]; then
+    # CPU Cores (power of 2 recommended for macOS: 1, 2, 4, 8, 16)
+    while true; do
+      display_and_log "\nRecommended CPU cores (power of 2): 1, 2, 4, 8, 16"
+      read -rp "CPU cores [4]: " PROC_COUNT
+      PROC_COUNT=${PROC_COUNT:-4}
+      if [[ "$PROC_COUNT" =~ ^[0-9]+$ ]]; then
+        if ! is_power_of_2 "$PROC_COUNT"; then
+          PROC_COUNT=$(next_power_of_2 "$PROC_COUNT")
+          display_and_log "→ Adjusted to next power of 2: $PROC_COUNT"
+        fi
+        break
+      else
+        display_and_log "→ CPU cores must be an integer. Please try again."
       fi
-      break
-    else
-      display_and_log "→ CPU cores must be an integer. Please try again."
-    fi
-  done
-  ((PROC_COUNT > MAX_CORES)) && PROC_COUNT=$MAX_CORES
+    done
+    ((PROC_COUNT > MAX_CORES)) && PROC_COUNT=$MAX_CORES
 
-  # RAM (modern macOS 15+ benefits from more RAM)
-  while true; do
-    default_ram=$((BASE_RAM_SIZE + PROC_COUNT * RAM_PER_CORE))
-    display_and_log "\nRecommended RAM: ${default_ram} MiB (minimum 4GB for macOS 15+)"
-    read -rp "RAM in MiB [$default_ram]: " RAM_SIZE
-    RAM_SIZE=${RAM_SIZE:-$default_ram}
-    if [[ "$RAM_SIZE" =~ ^[0-9]+$ ]]; then
-      break
-    else
-      display_and_log "→ RAM must be an integer. Please try again."
-    fi
-  done
+    # RAM (modern macOS 15+ benefits from more RAM)
+    while true; do
+      default_ram=$((BASE_RAM_SIZE + PROC_COUNT * RAM_PER_CORE))
+      display_and_log "\nRecommended RAM: ${default_ram} MiB (minimum 4GB for macOS 15+)"
+      read -rp "RAM in MiB [$default_ram]: " RAM_SIZE
+      RAM_SIZE=${RAM_SIZE:-$default_ram}
+      if [[ "$RAM_SIZE" =~ ^[0-9]+$ ]]; then
+        break
+      else
+        display_and_log "→ RAM must be an integer. Please try again."
+      fi
+    done
+  fi
 
   # Recovery image download (downloads macOS installer from Apple servers)
   echo

@@ -37,7 +37,13 @@ create_vm() {
     fi
   fi
   # Validate bridge exists in kernel before attempting VM creation
-  [[ ! -d "/sys/class/net/$bridge" ]] && log_and_exit "Bridge $bridge does not exist" "$logfile"
+  if [[ ! -d "/sys/class/net/$bridge" ]]; then
+    display_and_log "❌ Error: Network bridge '$bridge' does not exist" "$logfile"
+    display_and_log "   Available bridges:" "$logfile"
+    display_and_log "   $(ls -1 /sys/class/net/ | grep vmbr | tr '\n' ' ')" "$logfile"
+    display_and_log "   To create a new bridge, run: mac → Option 7" "$logfile"
+    log_and_exit "Network bridge validation failed" "$logfile"
+  fi
 
   # Build QEMU device arguments starting with Apple SMC emulation (required for macOS boot)
   local cpu_args device_args='-device isa-applesmc,osk="ourhardworkbythesewordsguardedpleasedontsteal(c)AppleComputerInc" -smbios type=2'
@@ -60,10 +66,6 @@ create_vm() {
   local qemu_version=$(qemu-system-x86_64 --version | awk '/version/ {print $4}' | cut -d'(' -f1)
   version_compare "$qemu_version" "6.1" && device_args="$device_args -global ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off"
 
-  # Debug: log the actual values being used
-  display_and_log "DEBUG: storage_iso='$storage_iso', iso_file='$iso_file'" "$logfile"
-  display_and_log "DEBUG: ide0 parameter: ${storage_iso}:iso/${iso_file},media=cdrom,cache=unsafe,size=96M" "$logfile"
-  
   # Execute Proxmox qm command with comprehensive VM configuration
   # macOS 15+ uses VirtIO network adapter per NEW-GUIDE.md
   qm create "$vm_id" \
@@ -76,9 +78,24 @@ create_vm() {
     --vga vmware --vmgenid 1 --scsihw virtio-scsi-pci \
     --virtio0 "${storage}:${disk_size},cache=none,discard=on" \
     --ide0 "${storage_iso}:iso/${iso_file},media=cdrom,cache=unsafe,size=96M" \
-    --ide2 "${storage_iso}:iso/${version_name,,}.iso,media=cdrom,cache=unsafe,size=${iso_size}" >>"$logfile" 2>&1 || log_and_exit "Failed to create VM" "$logfile"
+    --ide2 "${storage_iso}:iso/${version_name,,}-installer.iso,media=cdrom,cache=unsafe,size=${iso_size}" >>"$logfile" 2>&1 || {
+      display_and_log "❌ Error: Failed to create VM $vm_id" "$logfile"
+      display_and_log "   Possible causes:" "$logfile"
+      display_and_log "   1. VM ID $vm_id already exists (check: qm list)" "$logfile"
+      display_and_log "   2. Insufficient storage space on '$storage'" "$logfile"
+      display_and_log "   3. ISO files missing: ${iso_file} or ${version_name,,}-installer.iso" "$logfile"
+      display_and_log "   4. Storage '$storage' not accessible" "$logfile"
+      display_and_log "   Review detailed log: $logfile" "$logfile"
+      log_and_exit "VM creation failed - check errors above" "$logfile"
+    }
+  
   # Critical post-creation patch: Change ISO media type from cdrom to disk (macOS requirement)
-  sed -i 's/media=cdrom/media=disk/' "/etc/pve/qemu-server/$vm_id.conf" >>"$logfile" 2>&1 || log_and_exit "Failed to update VM config" "$logfile"
+  sed -i 's/media=cdrom/media=disk/' "/etc/pve/qemu-server/$vm_id.conf" >>"$logfile" 2>&1 || {
+    display_and_log "❌ Error: Failed to patch VM configuration file" "$logfile"
+    display_and_log "   This is a critical step for macOS booting" "$logfile"
+    display_and_log "   Try manually: sed -i 's/media=cdrom/media=disk/' /etc/pve/qemu-server/$vm_id.conf" "$logfile"
+    log_and_exit "VM config patch failed" "$logfile"
+  }
 
   display_and_log "VM ($vm_name) created successfully" "$logfile"
   

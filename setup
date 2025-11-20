@@ -104,6 +104,10 @@ if [[ $# -gt 0 ]]; then
         CLI_VM_NAME="$2"
         shift 2
         ;;
+      --profile)
+        CLI_PROFILE="$2"
+        shift 2
+        ;;
       --disk)
         CLI_DISK_SIZE="$2"
         shift 2
@@ -137,15 +141,30 @@ if [[ $# -gt 0 ]]; then
         echo "  --version <sequoia|tahoe>    macOS version to install"
         echo "  --vmid <id>                  VM ID (default: next available)"
         echo "  --name <name>                VM name (default: macOS-SEQUOIA or macOS-TAHOE)"
+        echo ""
+        echo "Configuration profiles (recommended):"
+        echo "  --profile <profile>          Use predefined configuration"
+        echo "                               Profiles: minimal, balanced, performance, maximum"
+        echo ""
+        echo "Or specify individual settings:"
         echo "  --disk <size>                Disk size in GB (default: 80)"
-        echo "  --storage <storage>          Proxmox storage name (default: auto-detect)"
-        echo "  --bridge <bridge>            Network bridge (default: vmbr0)"
         echo "  --cores <count>              CPU cores - power of 2 (default: 4)"
         echo "  --ram <size>                 RAM in MiB (default: auto-calculate)"
+        echo ""
+        echo "Additional options:"
+        echo "  --storage <storage>          Proxmox storage name (default: auto-detect)"
+        echo "  --bridge <bridge>            Network bridge (default: vmbr0)"
         echo "  --download-recovery          Download recovery image from Apple"
         echo ""
-        echo "Example:"
+        echo "Examples:"
+        echo "  # Using a profile (recommended)"
+        echo "  mac --version sequoia --profile balanced"
+        echo ""
+        echo "  # Custom configuration"
         echo "  mac --version sequoia --vmid 100 --name MyMac --disk 120 --cores 8"
+        echo ""
+        echo "  # Maximum performance with recovery download"
+        echo "  mac --version tahoe --profile maximum --download-recovery"
         exit 0
         ;;
       *)
