@@ -89,11 +89,30 @@ The wizard will guide you through:
 5. **Custom ISO Creation**: Builds OpenCore ISO with your unique serial
 6. **Recovery Download**: Optional macOS installer download from Apple
 
+### Configuration Profiles
+
+Hackintoshster includes predefined configuration profiles for common use cases:
+
+| Profile | CPU Cores | RAM | Disk | Best For |
+|---------|-----------|-----|------|----------|
+| **Minimal** | 4 | 8GB | 80GB | Basic macOS usage, testing |
+| **Balanced** | 8 | 16GB | 120GB | ⭐ Recommended for most users |
+| **Performance** | 12 | 24GB | 200GB | Development, content creation |
+| **Maximum** | 16 | 32GB | 300GB | Heavy workloads, compilation |
+| **Custom** | You specify | You specify | You specify | Full control over resources |
+
+**Interactive Mode**: Profiles are presented during VM configuration
+**CLI Mode**: Use `--profile <name>` for quick setup
+
 ### Non-Interactive Mode (Command Line)
 
 For automation or scripting:
 
 ```bash
+# Using a profile (recommended)
+mac --version sequoia --profile balanced
+
+# Custom configuration
 mac --version sequoia --vmid 100 --name MyMac --disk 120 --cores 8 --download-recovery
 ```
 
@@ -103,30 +122,48 @@ mac --version sequoia --vmid 100 --name MyMac --disk 120 --cores 8 --download-re
 --version <sequoia|tahoe>    macOS version to install (required)
 --vmid <id>                  VM ID (default: next available)
 --name <name>                VM name (default: macOS-SEQUOIA)
+
+Configuration profiles (recommended):
+--profile <profile>          Use predefined configuration
+                             Profiles: minimal, balanced, performance, maximum
+
+Or specify individual settings:
 --disk <size>                Disk size in GB (default: 80)
---storage <storage>          Proxmox storage (default: auto-detect)
---bridge <bridge>            Network bridge (default: vmbr0)
 --cores <count>              CPU cores, power of 2 (default: 4)
 --ram <size>                 RAM in MiB (default: 4GB + 1GB/core)
+
+Additional options:
+--storage <storage>          Proxmox storage (default: auto-detect)
+--bridge <bridge>            Network bridge (default: vmbr0)
 --download-recovery          Download macOS recovery from Apple
 --help                       Show help message
 ```
 
 #### CLI Examples
 
-**Minimal (uses all defaults):**
+**Quick setup with balanced profile:**
 ```bash
-mac --version sequoia
+mac --version sequoia --profile balanced
 ```
 
-**Custom resources:**
+**Maximum performance:**
+```bash
+mac --version tahoe --profile maximum --download-recovery
+```
+
+**Minimal resources (testing):**
+```bash
+mac --version sequoia --profile minimal
+```
+
+**Custom configuration:**
 ```bash
 mac --version tahoe --vmid 105 --name DevMachine --disk 200 --cores 8 --ram 16384
 ```
 
-**Cloud deployment:**
+**Cloud deployment with specific bridge:**
 ```bash
-mac --version sequoia --bridge vmbr1 --storage local-lvm --download-recovery
+mac --version sequoia --profile performance --bridge vmbr1 --download-recovery
 ```
 
 ---
@@ -331,7 +368,7 @@ After successful boot from the internal disk:
 2. Optionally delete the custom ISO to free space:
    ```bash
    rm /var/lib/vz/template/iso/OpenCore-{YourSerial}.iso
-   rm /var/lib/vz/template/iso/sequoia.iso  # or tahoe.iso
+   rm /var/lib/vz/template/iso/sequoia-installer.iso  # or tahoe-installer.iso
    ```
 
 **Done! Your macOS VM is now fully configured and boots independently.**
@@ -426,7 +463,7 @@ EFI_NEW/
 ### Recovery Image Format
 
 Recovery images are simplified:
-- **Naming**: `sequoia.iso`, `tahoe.iso` (not recovery-sequoia.iso)
+- **Naming**: `sequoia-installer.iso`, `tahoe-installer.iso`
 - **Format**: FAT32 disk image
 - **Source**: Official Apple recovery servers
 - **Size**: ~1.4GB
@@ -734,7 +771,7 @@ mac
 # Select: CRI - Clear all macOS recovery images
 ```
 
-This deletes `sequoia.iso` and `tahoe.iso` from your ISO storage. They'll be re-downloaded when needed.
+This deletes `sequoia-installer.iso` and `tahoe-installer.iso` from your ISO storage. They'll be re-downloaded when needed.
 
 ---
 
