@@ -190,21 +190,21 @@
             <key>Quirks</key>
             <dict>
                 <key>AllowRelocationBlock</key>
-                <false/>
+                <true/>
                 <key>AvoidRuntimeDefrag</key>
                 <true/>
                 <key>ClearTaskSwitchBit</key>
                 <false/>
                 <key>DevirtualiseMmio</key>
-                <true/>
+                <false/>
                 <key>DisableSingleUser</key>
                 <false/>
                 <key>DisableVariableWrite</key>
                 <false/>
                 <key>DiscardHibernateMap</key>
-                <true/>
+                <false/>
                 <key>EnableSafeModeSlide</key>
-                <true/>
+                <false/>
                 <key>EnableWriteUnprotector</key>
                 <true/>
                 <key>FixupAppleEfiImages</key>
@@ -218,21 +218,21 @@
                 <key>ProtectSecureBoot</key>
                 <false/>
                 <key>ProtectUefiServices</key>
-                <true/>
+                <false/>
                 <key>ProvideCustomSlide</key>
                 <true/>
                 <key>ProvideMaxSlide</key>
                 <integer>0</integer>
                 <key>RebuildAppleMemoryMap</key>
-                <true/>
+                <false/>
                 <key>ResizeAppleGpuBars</key>
                 <integer>0</integer>
                 <key>SetupVirtualMap</key>
-                <true/>
+                <false/>
                 <key>SignalAppleOS</key>
                 <false/>
                 <key>SyncRuntimePermissions</key>
-                <true/>
+                <false/>
             </dict>
         </dict>
         <key>DeviceProperties</key>
@@ -965,7 +965,7 @@
                 <key>DisplayDelay</key>
                 <integer>0</integer>
                 <key>DisplayLevel</key>
-                <integer>2147483650</integer>
+                <integer>0</integer>
                 <key>LogModules</key>
                 <string>*</string>
                 <key>SysReport</key>
@@ -1063,7 +1063,7 @@
                     <key>Arguments</key>
                     <string></string>
                     <key>Auxiliary</key>
-                    <false/>
+                    <true/>
                     <key>Comment</key>
                     <string></string>
                     <key>Enabled</key>
@@ -1085,7 +1085,7 @@
                     <key>Arguments</key>
                     <string></string>
                     <key>Auxiliary</key>
-                    <false/>
+                    <true/>
                     <key>Comment</key>
                     <string></string>
                     <key>Enabled</key>
@@ -1338,6 +1338,18 @@
                     <false/>
                     <key>Path</key>
                     <string>OpenRuntime.efi</string>
+                </dict>
+                <dict>
+                    <key>Arguments</key>
+                    <string></string>
+                    <key>Comment</key>
+                    <string></string>
+                    <key>Enabled</key>
+                    <true/>
+                    <key>LoadEarly</key>
+                    <false/>
+                    <key>Path</key>
+                    <string>OpenPartitionDxe.efi</string>
                 </dict>
             </array>
             <key>Input</key>
