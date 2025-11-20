@@ -8,6 +8,10 @@
 # Source this file at the beginning of other scripts: source "${SCRIPT_DIR}/scripts/lib/config.sh"
 #
 
+# Source persistence library for user preferences
+PERSISTENCE_LIB="${SCRIPT_DIR}/scripts/lib/persistence.sh"
+[[ -f "$PERSISTENCE_LIB" ]] && source "$PERSISTENCE_LIB"
+
 # Global configuration constants defining paths, versions, and resource allocation defaults
 export SCRIPT_DIR="${SCRIPT_DIR:-/root/PROXMOX-macOS}"  # Primary working directory for all script operations
 export LOGDIR="${LOGDIR:-${SCRIPT_DIR}/logs}"           # Centralized location for all operation logs

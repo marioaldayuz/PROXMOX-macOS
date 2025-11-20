@@ -32,7 +32,11 @@ init_dirs() {
 # Displays banner with version info, dynamically sorted macOS options, and utility commands
 # Loops indefinitely until user exits, routing selections to appropriate handler functions
 # Queries Proxmox for next available VM ID on each iteration
+# Dynamically adjusts menu options based on enterprise vs community repository
 main_menu() {
+  # Detect repository type once per session
+  local IS_ENTERPRISE=$(detect_repository_type)
+  
   while true; do
     clear
     # Fetch next available VM ID from Proxmox cluster
@@ -62,15 +66,63 @@ main_menu() {
     echo "╔═══════════════════════════════════════════════════════════╗"
     echo "║ SYSTEM UTILITIES                                          ║"
     echo "╚═══════════════════════════════════════════════════════════╝"
-    echo " 3 - Add Proxmox VE no-subscription repository"
-    echo " 4 - Update default OpenCore ISO (legacy/fallback only)"
-    echo " 5 - Clear all cached macOS recovery images"
-    echo " 6 - Remove Proxmox subscription notice"
-    echo " 7 - Add new network bridge (macOS in cloud)"
-    echo " 8 - Customize OpenCore config.plist"
+    
+    # Build dynamic menu based on repository type
+    declare -A MENU_OPTIONS
+    local option_num=3
+    
+    # Only show subscription-related options for non-enterprise users
+    if [[ "$IS_ENTERPRISE" != "true" ]]; then
+      echo " ${option_num} - Add Proxmox VE no-subscription repository"
+      MENU_OPTIONS[$option_num]="add_no_subscription_repo"
+      ((option_num++))
+    fi
+    
+    echo " ${option_num} - Update default OpenCore ISO (legacy/fallback only)"
+    MENU_OPTIONS[$option_num]="update_opencore_iso"
+    ((option_num++))
+    
+    echo " ${option_num} - Clear all cached macOS recovery images"
+    MENU_OPTIONS[$option_num]="clear_recovery_images"
+    ((option_num++))
+    
+    # Only show subscription notice removal for non-enterprise users
+    if [[ "$IS_ENTERPRISE" != "true" ]]; then
+      echo " ${option_num} - Remove Proxmox subscription notice"
+      MENU_OPTIONS[$option_num]="remove_subscription_notice"
+      ((option_num++))
+    fi
+    
+    echo " ${option_num} - Add new network bridge (macOS in cloud)"
+    MENU_OPTIONS[$option_num]="configure_network_bridge"
+    ((option_num++))
+    
+    echo " ${option_num} - Customize OpenCore config.plist"
+    MENU_OPTIONS[$option_num]="customize_opencore_config"
+    ((option_num++))
+    
+    echo " ${option_num} - Set default bridge"
+    MENU_OPTIONS[$option_num]="set_default_bridge_interactive"
+    ((option_num++))
+    
+    echo " ${option_num} - Configure default profile & preferences"
+    MENU_OPTIONS[$option_num]="configure_default_preferences"
+    ((option_num++))
+    
     echo
     echo " 0   - Quit (or press ENTER)"
     echo
+    
+    # Show current defaults if set
+    local default_bridge=$(get_default_bridge)
+    local default_profile=$(get_default_profile)
+    if [[ "$default_bridge" != "vmbr0" ]] || [[ -n "$default_profile" ]]; then
+      echo "Current defaults:"
+      [[ "$default_bridge" != "vmbr0" ]] && echo "  Bridge: $default_bridge"
+      [[ -n "$default_profile" ]] && echo "  Profile: $default_profile"
+      echo
+    fi
+    
     read -rp "Select Option: " OPT
     # Exit on empty input or explicit zero
     [[ -z "$OPT" || "$OPT" -eq 0 ]] && exit
@@ -78,16 +130,10 @@ main_menu() {
     # Route numeric selections to VM configuration, text selections to utility functions
     if [[ ${MACOS_CONFIG[$OPT]} ]]; then
       configure_macos_vm "${MACOS_CONFIG[$OPT]}" "$NEXTID" "$OPT"
+    elif [[ -n "${MENU_OPTIONS[$OPT]}" ]]; then
+      ${MENU_OPTIONS[$OPT]}
     else
-      case $OPT in
-        3) add_no_subscription_repo ;;
-        4) update_opencore_iso ;;
-        5) clear_recovery_images ;;
-        6) remove_subscription_notice ;;
-        7) configure_network_bridge ;;
-        8) customize_opencore_config ;;
-        *) echo "Invalid option"; read -n 1 -s ;;
-      esac
+      echo "Invalid option"; read -n 1 -s
     fi
   done
 }
