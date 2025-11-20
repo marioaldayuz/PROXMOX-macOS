@@ -25,22 +25,25 @@ declare -gA VM_PROFILES=(
 )
 
 # Display available profiles with descriptions
-# Returns: Nothing (displays to stdout)
+# Returns: Nothing (displays to terminal)
 display_profiles() {
-  echo "╔═══════════════════════════════════════════════════════════╗"
-  echo "║ VM CONFIGURATION PROFILES                                 ║"
-  echo "╚═══════════════════════════════════════════════════════════╝"
-  echo
-  
-  local profile_num=1
-  for profile in minimal balanced performance maximum; do
-    IFS='|' read -r cores ram disk desc <<< "${VM_PROFILES[$profile]}"
-    printf " %d - %s\n" "$profile_num" "$desc"
-    ((profile_num++))
-  done
-  
-  echo " 5 - Custom (specify your own values)"
-  echo
+  # Output to /dev/tty to ensure display even when called in command substitution
+  {
+    echo "╔═══════════════════════════════════════════════════════════╗"
+    echo "║ VM CONFIGURATION PROFILES                                 ║"
+    echo "╚═══════════════════════════════════════════════════════════╝"
+    echo
+    
+    local profile_num=1
+    for profile in minimal balanced performance maximum; do
+      IFS='|' read -r cores ram disk desc <<< "${VM_PROFILES[$profile]}"
+      printf " %d - %s\n" "$profile_num" "$desc"
+      ((profile_num++))
+    done
+    
+    echo " 5 - Custom (specify your own values)"
+    echo
+  } >&2
 }
 
 # Get profile by number (1-5)
@@ -79,7 +82,7 @@ select_profile_interactive() {
   
   while true; do
     display_profiles
-    read -rp "Select profile (1-5): " profile_choice
+    read -rp "Select profile (1-5): " profile_choice </dev/tty
     
     local profile_name=$(get_profile_by_number "$profile_choice")
     if [[ $? -eq 0 && -n "$profile_name" ]]; then
@@ -88,20 +91,24 @@ select_profile_interactive() {
         return 0
       else
         IFS='|' read -r cores ram disk desc <<< "${VM_PROFILES[$profile_name]}"
-        echo
-        echo "Selected: $desc"
-        echo "  CPU Cores: $cores"
-        echo "  RAM: $((ram / 1024))GB"
-        echo "  Disk: ${disk}GB"
-        echo
-        read -rp "Confirm selection? (y/n): " confirm
+        {
+          echo
+          echo "Selected: $desc"
+          echo "  CPU Cores: $cores"
+          echo "  RAM: $((ram / 1024))GB"
+          echo "  Disk: ${disk}GB"
+          echo
+        } >&2
+        read -rp "Confirm selection? (y/n): " confirm </dev/tty
         if [[ "$confirm" =~ ^[Yy]$ ]]; then
           echo "$profile_name"
           return 0
         fi
       fi
     else
-      echo "Invalid selection. Please enter 1-5."
+      {
+        echo "Invalid selection. Please enter 1-5."
+      } >&2
       sleep 1
     fi
   done
@@ -112,56 +119,60 @@ select_profile_interactive() {
 get_custom_config_interactive() {
   local cores ram disk
   
-  echo
-  echo "╔═══════════════════════════════════════════════════════════╗"
-  echo "║ CUSTOM VM CONFIGURATION                                   ║"
-  echo "╚═══════════════════════════════════════════════════════════╝"
-  echo
+  {
+    echo
+    echo "╔═══════════════════════════════════════════════════════════╗"
+    echo "║ CUSTOM VM CONFIGURATION                                   ║"
+    echo "╚═══════════════════════════════════════════════════════════╝"
+    echo
+  } >&2
   
   # Get CPU cores
   while true; do
-    read -rp "CPU cores (2-${MAX_CORES}, recommended power of 2): " cores
+    read -rp "CPU cores (2-${MAX_CORES}, recommended power of 2): " cores </dev/tty
     if validate_cpu_cores "$cores" && (( cores >= 2 && cores <= MAX_CORES )); then
       # Check if power of 2
       if (( (cores & (cores - 1)) != 0 )); then
-        echo "⚠️  Warning: $cores is not a power of 2. macOS may not detect all cores correctly."
-        read -rp "Continue anyway? (y/n): " continue_choice
+        echo "⚠️  Warning: $cores is not a power of 2. macOS may not detect all cores correctly." >&2
+        read -rp "Continue anyway? (y/n): " continue_choice </dev/tty
         [[ "$continue_choice" =~ ^[Yy]$ ]] && break
       else
         break
       fi
     else
-      echo "❌ Invalid input. Enter a number between 2 and ${MAX_CORES}."
+      echo "❌ Invalid input. Enter a number between 2 and ${MAX_CORES}." >&2
     fi
   done
   
   # Get RAM
   while true; do
-    read -rp "RAM in GB (4-256): " ram_gb
+    read -rp "RAM in GB (4-256): " ram_gb </dev/tty
     if [[ "$ram_gb" =~ ^[0-9]+$ ]] && (( ram_gb >= 4 && ram_gb <= 256 )); then
       ram=$((ram_gb * 1024))
       break
     else
-      echo "❌ Invalid input. Enter a number between 4 and 256."
+      echo "❌ Invalid input. Enter a number between 4 and 256." >&2
     fi
   done
   
   # Get disk size
   while true; do
-    read -rp "Disk size in GB (60-2000): " disk
+    read -rp "Disk size in GB (60-2000): " disk </dev/tty
     if validate_disk_size "$disk" && (( disk >= 60 && disk <= 2000 )); then
       break
     else
-      echo "❌ Invalid input. Enter a number between 60 and 2000."
+      echo "❌ Invalid input. Enter a number between 60 and 2000." >&2
     fi
   done
   
-  echo
-  echo "Custom configuration:"
-  echo "  CPU Cores: $cores"
-  echo "  RAM: ${ram_gb}GB"
-  echo "  Disk: ${disk}GB"
-  echo
+  {
+    echo
+    echo "Custom configuration:"
+    echo "  CPU Cores: $cores"
+    echo "  RAM: ${ram_gb}GB"
+    echo "  Disk: ${disk}GB"
+    echo
+  } >&2
   
   echo "$cores|$ram|$disk"
 }
