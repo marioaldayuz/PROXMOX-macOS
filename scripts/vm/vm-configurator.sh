@@ -53,8 +53,43 @@ create_vm_noninteractive() {
     log_and_exit "VM ID conflict" "$logfile"
   fi
   
-  # Set VM name (use default if not specified)
-  local vm_name="${CLI_VM_NAME:-${DEFAULT_VM_PREFIX}$(echo "$version_name" | tr -s ' ' | sed 's/^[ ]*//;s/[ ]*$//;s/[ ]/-/g' | tr '[:lower:]' '[:upper:]' | sed 's/-*$//')}"
+  # Build custom OpenCore ISO first to get SMBIOS serial number
+  display_and_log "Building custom OpenCore ISO..." "$logfile"
+  local custom_iso_name
+  local serial_file="${TMPDIR}/.serial-$$"
+  local temp_output="${TMPDIR}/.iso-output-cli-$$"
+  
+  build_custom_opencore_iso > "$temp_output" 2>&1
+  local build_result=$?
+  
+  if [ $build_result -eq 0 ]; then
+    custom_iso_name=$(grep '\.iso$' "$temp_output" | tail -1)
+  fi
+  rm -f "$temp_output"
+  
+  if [ $build_result -ne 0 ] || [ -z "$custom_iso_name" ]; then
+    display_and_log "❌ Error: Failed to build custom OpenCore ISO" "$logfile"
+    display_and_log "   Check log: ${LOGDIR}/build-custom-iso.log" "$logfile"
+    log_and_exit "ISO build failed" "$logfile"
+  fi
+  
+  # Read the serial number for VM naming
+  local smbios_serial=""
+  if [ -f "$serial_file" ]; then
+    smbios_serial=$(cat "$serial_file")
+    rm -f "$serial_file"
+  fi
+  
+  display_and_log "✓ Custom ISO created: $custom_iso_name" "$logfile"
+  
+  # Set VM name with serial number (use default if not specified by user)
+  local version_lower=$(echo "$version_name" | tr '[:upper:]' '[:lower:]')
+  local default_vm_name="macOS-${version_lower}"
+  if [ -n "$smbios_serial" ]; then
+    default_vm_name="macOS-${version_lower}-${smbios_serial}"
+  fi
+  
+  local vm_name="${CLI_VM_NAME:-$default_vm_name}"
   
   if ! validate_vm_name "$vm_name"; then
     display_and_log "❌ Error: Invalid VM name: $vm_name" "$logfile"
@@ -129,8 +164,9 @@ create_vm_noninteractive() {
   display_and_log "  Bridge: $bridge" "$logfile"
   display_and_log "  Cores: $cores" "$logfile"
   display_and_log "  RAM: ${ram}MiB" "$logfile"
+  display_and_log "  Custom ISO: $custom_iso_name" "$logfile"
   
-  create_vm "$version_name" "$vm_id" "$vm_name" "$disk_size" "$storage" "$cores" "$ram" "$iso_size" "$disk_type" "$bridge"
+  create_vm "$version_name" "$vm_id" "$vm_name" "$disk_size" "$storage" "$cores" "$ram" "$iso_size" "$disk_type" "$bridge" "$custom_iso_name"
   
   display_and_log "VM created successfully!" "$logfile"
   display_and_log "Start VM: qm start $vm_id" "$logfile"
@@ -147,9 +183,7 @@ configure_macos_vm() {
   local version_name version board_id model_id iso_size disk_type opt=$3
   # Parse macOS configuration string from MACOS_CONFIG array
   IFS='|' read -r version_name version board_id model_id iso_size disk_type <<< "$macopt"
-  # Generate default VM name from version (e.g., "macOS-SEQUOIA" or "macOS-TAHOE")
-  local default_vm_name="${DEFAULT_VM_PREFIX}$(echo "$version_name" | tr -s ' ' | sed 's/^[ ]*//;s/[ ]*$//;s/[ ]/-/g' | tr '[:lower:]' '[:upper:]' | sed 's/-*$//')"
-  validate_vm_name "$default_vm_name" || log_and_exit "Invalid default VM name: $default_vm_name" "${LOGDIR}/main-menu.log"
+  
   clear
   display_and_log "══════════════════════════════════════════════════"
   display_and_log "  Configuring macOS $version_name VM"
@@ -166,8 +200,55 @@ configure_macos_vm() {
     fi
   done
 
-  # Prompt for VM name with character validation
+  echo
+  echo "══════════════════════════════════════════════════"
+  echo "  Building Custom OpenCore ISO"
+  echo "══════════════════════════════════════════════════"
+  echo
+  
+  # Build custom OpenCore ISO with PROXMOX-EFI base (generates SMBIOS here)
+  local CUSTOM_ISO_NAME
+  local temp_output="${TMPDIR}/.iso-output-$$"
+  local serial_file="${TMPDIR}/.serial-$$"
+  
+  # Run the builder, show output to user, and capture to file
+  build_custom_opencore_iso | tee "$temp_output"
+  local build_result=${PIPESTATUS[0]}
+  
+  # Extract only the ISO filename (last line that ends with .iso)
+  if [ $build_result -eq 0 ]; then
+    CUSTOM_ISO_NAME=$(grep '\.iso$' "$temp_output" | tail -1)
+  fi
+  rm -f "$temp_output"
+  
+  if [ $build_result -ne 0 ] || [ -z "$CUSTOM_ISO_NAME" ]; then
+    display_and_log "Failed to build custom ISO. Cannot proceed with VM creation."
+    read -n 1 -sp "Press any key to return to menu..."
+    return 1
+  fi
+  
+  # Read the serial number that was saved during ISO building
+  local smbios_serial=""
+  if [ -f "$serial_file" ]; then
+    smbios_serial=$(cat "$serial_file")
+    rm -f "$serial_file"
+  fi
+  
+  display_and_log "Custom ISO ready for VM creation: $CUSTOM_ISO_NAME"
+  echo
+  
+  # Generate default VM name with serial number
+  # Format: macOS-sequoia-C02YD3ZBHX87 or macOS-tahoe-C02YD3ZBHX87
+  local version_lower=$(echo "$version_name" | tr '[:upper:]' '[:lower:]')
+  local default_vm_name="macOS-${version_lower}"
+  if [ -n "$smbios_serial" ]; then
+    default_vm_name="macOS-${version_lower}-${smbios_serial}"
+  fi
+  
+  # Prompt for VM name with character validation (now optional with smart default)
   while true; do
+    echo "VM Name (press ENTER for default):"
+    echo "  Default: ${default_vm_name}"
     read -rp "VM Name [${default_vm_name}]: " VM_NAME
     VM_NAME=${VM_NAME:-$default_vm_name}
     if validate_vm_name "$VM_NAME"; then
@@ -210,36 +291,6 @@ configure_macos_vm() {
   fi
 
   echo
-  echo "══════════════════════════════════════════════════"
-  echo "  Building Custom OpenCore ISO"
-  echo "══════════════════════════════════════════════════"
-  echo
-  
-  # Build custom OpenCore ISO with PROXMOX-EFI base
-  local CUSTOM_ISO_NAME
-  local temp_output="${TMPDIR}/.iso-output-$$"
-  
-  # Run the builder, show output to user, and capture to file
-  build_custom_opencore_iso | tee "$temp_output"
-  local build_result=${PIPESTATUS[0]}
-  
-  # Extract only the ISO filename (last line that ends with .iso)
-  if [ $build_result -eq 0 ]; then
-    CUSTOM_ISO_NAME=$(grep '\.iso$' "$temp_output" | tail -1)
-  fi
-  rm -f "$temp_output"
-  
-  if [ $build_result -ne 0 ] || [ -z "$CUSTOM_ISO_NAME" ]; then
-    display_and_log "Failed to build custom ISO. Cannot proceed with VM creation."
-    read -n 1 -sp "Press any key to return to menu..."
-    return 1
-  fi
-  
-  display_and_log "Custom ISO ready for VM creation: $CUSTOM_ISO_NAME"
-  read -n 1 -sp "Press any key to continue with VM configuration..."
-  echo
-  echo
-
   # Modern macOS 15+ requires more disk space - default to 80GB
   # Only prompt if using custom config (profile already set this)
   if [[ "$USE_CUSTOM_CONFIG" == "true" ]]; then

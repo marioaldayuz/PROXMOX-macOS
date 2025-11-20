@@ -548,6 +548,11 @@ build_custom_opencore_iso() {
   
   # Call build script - all progress will be visible
   local iso_result_file="${TMPDIR}/.iso-name-$$"
+  local serial_result_file="${TMPDIR}/.serial-$$"
+  
+  # Save serial to temp file for later use in VM naming
+  echo "$serial" > "$serial_result_file"
+  
   "${SCRIPT_DIR}/scripts/build-custom-iso.sh" \
     --efi-source "Builder_EFIs/PROXMOX-EFI" \
     --smbios-json "$smbios_json" \
