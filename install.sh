@@ -85,6 +85,12 @@ log_message "Detected platform: $OSX_PLATFORM"
 log_message "Detecting Proxmox subscription type..."
 IS_ENTERPRISE=false
 
+# Source persistence library if available
+PERSISTENCE_LIB="${SCRIPT_DIR}/scripts/lib/persistence.sh"
+if [[ -f "$PERSISTENCE_LIB" ]]; then
+    source "$PERSISTENCE_LIB"
+fi
+
 # Check if subscription appears to be configured
 if [ -f "/etc/apt/sources.list.d/pve-enterprise.list" ] || [ -f "/etc/apt/sources.list.d/pve-enterprise.sources" ]; then
     # Enterprise repos exist - check if subscription is active
@@ -136,6 +142,15 @@ else
         log_message "User selected Enterprise installation"
     else
         log_message "User selected Home Lab/Community installation"
+    fi
+fi
+
+# Persist enterprise detection for future use
+if [[ -f "$PERSISTENCE_LIB" ]]; then
+    if [[ "$IS_ENTERPRISE" == "true" ]]; then
+        set_config_value "IS_ENTERPRISE" "true"
+    else
+        set_config_value "IS_ENTERPRISE" "false"
     fi
 fi
 

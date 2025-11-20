@@ -129,8 +129,11 @@ create_vm_noninteractive() {
     ram="${CLI_RAM:-$((BASE_RAM_SIZE + cores * RAM_PER_CORE))}"
   fi
   
-  # Get storage
+  # Get storage (use CLI arg, then default from config, then auto-detect)
   local storage="${CLI_STORAGE}"
+  if [[ -z "$storage" ]]; then
+    storage=$(get_default_storage)
+  fi
   if [[ -z "$storage" ]]; then
     local storage_output=$(get_available_storages) || {
       display_and_log "❌ Error: Failed to retrieve available storages" "$logfile"
@@ -141,8 +144,11 @@ create_vm_noninteractive() {
     storage="$default_storage"
   fi
   
-  # Get bridge
-  local bridge="${CLI_BRIDGE:-vmbr0}"
+  # Get bridge (use CLI arg, then default from config, then vmbr0)
+  local bridge="${CLI_BRIDGE}"
+  if [[ -z "$bridge" ]]; then
+    bridge=$(get_default_bridge)
+  fi
   if [[ ! -d "/sys/class/net/$bridge" ]]; then
     display_and_log "❌ Error: Network bridge '$bridge' does not exist" "$logfile"
     display_and_log "   Available bridges: $(ls -1 /sys/class/net/ | grep vmbr | tr '\n' ' ')" "$logfile"
@@ -264,29 +270,60 @@ configure_macos_vm() {
   echo "══════════════════════════════════════════════════"
   echo
   
-  # Profile selection
-  local selected_profile=$(select_profile_interactive)
+  # Check if default profile is set
+  local default_profile=$(get_default_profile)
+  local selected_profile=""
   local SIZEDISK PROC_COUNT RAM_SIZE
   
-  if [[ "$selected_profile" == "custom" ]]; then
-    # Custom configuration - will prompt for each value individually later
-    USE_CUSTOM_CONFIG=true
-  else
-    # Use profile values
-    IFS='|' read -r PROC_COUNT RAM_SIZE SIZEDISK <<< "$(get_profile_values "$selected_profile")"
-    USE_CUSTOM_CONFIG=false
+  if [[ -n "$default_profile" ]]; then
+    echo "Default profile detected: $default_profile"
+    IFS='|' read -r _ _ _ desc <<< "${VM_PROFILES[$default_profile]}"
+    echo "  $desc"
+    echo
+    read -rp "Use default profile? (y/n) [Y]: " use_default
+    use_default=${use_default:-Y}
     
-    echo
-    echo "Profile configuration applied:"
-    echo "  CPU Cores: $PROC_COUNT"
-    echo "  RAM: $((RAM_SIZE / 1024))GB ($RAM_SIZE MiB)"
-    echo "  Disk: ${SIZEDISK}GB"
-    echo
-    read -rp "Continue with these settings? (y/n): " confirm_profile
-    if [[ ! "$confirm_profile" =~ ^[Yy]$ ]]; then
-      display_and_log "Configuration cancelled. Returning to menu..."
-      read -n 1 -sp "Press any key to continue..."
-      return 1
+    if [[ "${use_default^^}" == "Y" ]]; then
+      selected_profile="$default_profile"
+      IFS='|' read -r PROC_COUNT RAM_SIZE SIZEDISK <<< "$(get_profile_values "$selected_profile")"
+      USE_CUSTOM_CONFIG=false
+      
+      echo
+      echo "Using default profile configuration:"
+      echo "  CPU Cores: $PROC_COUNT"
+      echo "  RAM: $((RAM_SIZE / 1024))GB ($RAM_SIZE MiB)"
+      echo "  Disk: ${SIZEDISK}GB"
+      echo
+    else
+      selected_profile=$(select_profile_interactive)
+    fi
+  else
+    # No default profile, show selection
+    selected_profile=$(select_profile_interactive)
+  fi
+  
+  # Process profile selection if not already done
+  if [[ -z "$USE_CUSTOM_CONFIG" ]]; then
+    if [[ "$selected_profile" == "custom" ]]; then
+      # Custom configuration - will prompt for each value individually later
+      USE_CUSTOM_CONFIG=true
+    else
+      # Use profile values
+      IFS='|' read -r PROC_COUNT RAM_SIZE SIZEDISK <<< "$(get_profile_values "$selected_profile")"
+      USE_CUSTOM_CONFIG=false
+      
+      echo
+      echo "Profile configuration applied:"
+      echo "  CPU Cores: $PROC_COUNT"
+      echo "  RAM: $((RAM_SIZE / 1024))GB ($RAM_SIZE MiB)"
+      echo "  Disk: ${SIZEDISK}GB"
+      echo
+      read -rp "Continue with these settings? (y/n): " confirm_profile
+      if [[ ! "$confirm_profile" =~ ^[Yy]$ ]]; then
+        display_and_log "Configuration cancelled. Returning to menu..."
+        read -n 1 -sp "Press any key to continue..."
+        return 1
+      fi
     fi
   fi
 
@@ -306,7 +343,7 @@ configure_macos_vm() {
     done
   fi
 
-  # Storage Selection
+  # Storage Selection (use persisted default if available)
   local storage_output=$(get_available_storages) || { display_and_log "Failed to retrieve storages"; read -n 1 -s; return 1; }
   local storages=() default_storage=""
   while IFS= read -r line; do
@@ -316,6 +353,19 @@ configure_macos_vm() {
   if ((${#storages[@]} == 0)); then
     display_and_log "No storages found"; read -n 1 -s; return 1
   fi
+  
+  # Check for persisted default storage
+  local preferred_storage=$(get_default_storage)
+  if [[ -n "$preferred_storage" ]]; then
+    # Verify it's still available
+    for s in "${storages[@]}"; do
+      if [[ "$preferred_storage" == "${s%%|*}" ]]; then
+        default_storage="$preferred_storage"
+        break
+      fi
+    done
+  fi
+  
   if ((${#storages[@]} == 1)); then
     STORAGECRTVM="${storages[0]%%|*}"
     display_and_log "Using storage: $STORAGECRTVM"
@@ -325,7 +375,9 @@ configure_macos_vm() {
       for s in "${storages[@]}"; do
         storage_name="${s%%|*}"
         avail_space="${s##*|}"
-        display_and_log "  - $storage_name ($avail_space GB)"
+        marker=""
+        [[ "$storage_name" == "$preferred_storage" ]] && marker=" (default)"
+        display_and_log "  - $storage_name ($avail_space GB)${marker}"
       done
       read -rp "Storage [${default_storage}]: " STORAGECRTVM
       STORAGECRTVM=${STORAGECRTVM:-$default_storage}
@@ -345,7 +397,7 @@ configure_macos_vm() {
     done
   fi
 
-  # Bridge Selection
+  # Bridge Selection (use persisted default if available)
   local bridge_output=$(get_available_bridges) || { display_and_log "Failed to retrieve bridges"; read -n 1 -s; return 1; }
   local bridges=() default_bridge=""
   while IFS= read -r line; do
@@ -369,7 +421,10 @@ configure_macos_vm() {
 
   mapfile -t sorted_names < <(printf '%s\n' "${!bridge_info[@]}" | sort -V)
 
-  local default_bridge_num=${default_bridge#vmbr}
+  # Use persisted default bridge or fall back to vmbr0
+  local preferred_bridge=$(get_default_bridge)
+  local default_bridge_num=${preferred_bridge#vmbr}
+  
   if ((${#bridges[@]} == 1)); then
     name="${sorted_names[0]}"
     ip_info="${bridge_info[$name]}"
@@ -381,7 +436,9 @@ configure_macos_vm() {
       for name in "${sorted_names[@]}"; do
         bridge_num=${name#vmbr}
         ip_info="${bridge_info[$name]}"
-        display_and_log "  - $bridge_num ($name, $ip_info)"
+        marker=""
+        [[ "$name" == "$preferred_bridge" ]] && marker=" (default)"
+        display_and_log "  - $bridge_num ($name, $ip_info)${marker}"
       done
       read -rp "Bridge number [${default_bridge_num}]: " BRIDGE_NUM
       BRIDGE_NUM=${BRIDGE_NUM:-$default_bridge_num}
