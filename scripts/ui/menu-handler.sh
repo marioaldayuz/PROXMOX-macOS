@@ -78,6 +78,10 @@ main_menu() {
       ((option_num++))
     fi
     
+    echo " ${option_num} - Download macOS installer ISOs"
+    MENU_OPTIONS[$option_num]="download_installer_isos_interactive"
+    ((option_num++))
+    
     echo " ${option_num} - Update default OpenCore ISO (legacy/fallback only)"
     MENU_OPTIONS[$option_num]="update_opencore_iso"
     ((option_num++))

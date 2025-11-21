@@ -155,9 +155,26 @@ create_vm_noninteractive() {
     log_and_exit "Bridge not found" "$logfile"
   fi
   
-  # Download recovery image if requested
-  if [[ "${CLI_DOWNLOAD_RECOVERY}" == "yes" ]]; then
-    download_recovery_image "$version_name" "$board_id" "$model_id" "$iso_size"
+  # Check for installer ISO and download if needed
+  if ! check_installer_iso_exists "$version_name"; then
+    display_and_log "Installer ISO not found for $version_name" "$logfile"
+    
+    if [[ "${CLI_DOWNLOAD_RECOVERY}" == "yes" ]]; then
+      # Try downloading pre-built ISO first
+      display_and_log "Attempting to download pre-built installer ISO..." "$logfile"
+      if download_installer_iso "$version_name"; then
+        display_and_log "✓ Installer ISO downloaded successfully" "$logfile"
+      else
+        display_and_log "Failed to download pre-built ISO, building from Apple recovery images..." "$logfile"
+        download_recovery_image "$version_name" "$board_id" "$model_id" "$iso_size"
+      fi
+    else
+      display_and_log "❌ Error: Installer ISO required but not found" "$logfile"
+      display_and_log "   Use --download-recovery to download the installer" "$logfile"
+      log_and_exit "Missing installer ISO" "$logfile"
+    fi
+  else
+    display_and_log "✓ Using existing installer ISO: ${version_name,,}-installer.iso" "$logfile"
   fi
   
   # Create VM
@@ -489,12 +506,36 @@ configure_macos_vm() {
     done
   fi
 
-  # Recovery image download (downloads macOS installer from Apple servers)
+  # Check for installer ISO and offer download if missing
   echo
-  display_and_log "Download macOS recovery image from Apple?"
-  display_and_log "(Required for first-time installation, can skip if already downloaded)"
-  read -rp "Download recovery image? [Y/n]: " CRTRECODISK
-  [[ "${CRTRECODISK:-Y}" =~ ^[Yy]$ ]] && download_recovery_image "$version_name" "$board_id" "$model_id" "$iso_size"
+  echo "══════════════════════════════════════════════════"
+  echo "  macOS Installer ISO"
+  echo "══════════════════════════════════════════════════"
+  echo
+  
+  if ! check_and_offer_installer_download "$version_name"; then
+    display_and_log "VM creation cancelled - installer ISO required"
+    read -n 1 -sp "Press any key to return to menu..."
+    return 1
+  fi
+  
+  # Check if installer ISO now exists
+  if ! check_installer_iso_exists "$version_name"; then
+    # ISO still doesn't exist, offer to build from recovery
+    echo
+    display_and_log "Building macOS installer from Apple recovery images..."
+    display_and_log "(This will download recovery files directly from Apple)"
+    echo
+    read -rp "Continue with recovery image download? [Y/n]: " CRTRECODISK
+    if [[ ! "${CRTRECODISK:-Y}" =~ ^[Yy]$ ]]; then
+      display_and_log "VM creation cancelled"
+      read -n 1 -sp "Press any key to return to menu..."
+      return 1
+    fi
+    download_recovery_image "$version_name" "$board_id" "$model_id" "$iso_size"
+  else
+    display_and_log "✓ Using existing installer ISO: ${version_name,,}-installer.iso"
+  fi
   # Execute VM creation with all collected parameters (including custom ISO)
   create_vm "$version_name" "$VM_ID" "$VM_NAME" "$SIZEDISK" "$STORAGECRTVM" "$PROC_COUNT" "$RAM_SIZE" "$iso_size" "$disk_type" "$BRIDGECRTVM" "$CUSTOM_ISO_NAME"
   
